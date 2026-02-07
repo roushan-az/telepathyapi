@@ -1,0 +1,49 @@
+# --- Build Tool Artifacts ---
+target/
+*.class
+# This ensures we don't ignore nested build folders accidentally
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+# --- Maven Wrapper ---
+# Keep the wrapper scripts, but ignore the binary jar if you prefer.
+# Standard practice is to actually TRACK the jar so others can run 'mvnw' immediately.
+# If you want to track it, COMMENT OUT the line below:
+.mvn/wrapper/maven-wrapper.jar
+
+# --- IDE Specifics ---
+# STS / Eclipse
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+# IntelliJ IDEA
+.idea/
+*.iws
+*.iml
+*.ipr
+# Ignore the out directory created by IntelliJ
+out/
+
+# NetBeans
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+build/
+
+# VS Code
+.vscode/
+
+# --- System & Logs ---
+*.log
+.DS_Store
+Thumps.db
+
+# --- Help Files ---
+HELP.md
