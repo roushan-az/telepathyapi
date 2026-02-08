@@ -1,6 +1,5 @@
 package com.singh.telepathyapi.config;
 
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.cors.CorsConfiguration;
@@ -11,40 +10,69 @@ import java.util.Arrays;
 import java.util.List;
 
 /**
- * CORS Configuration
- * 
- * Required for WebRTC peer-to-peer connections
- * Allows cross-origin requests for signaling
+ * Global CORS Configuration
+ *
+ * This fixes the CORS error when allowCredentials is true.
+ * Instead of using "*" for origins, we use allowedOriginPatterns which supports wildcards
+ * and works with credentials.
  */
 @Configuration
 public class CorsConfig {
 
-    @Value("${cors.allowed-origins}")
-    private String[] allowedOrigins;
-
-    @Value("${cors.allowed-methods}")
-    private String[] allowedMethods;
-
-    @Value("${cors.allowed-headers}")
-    private String allowedHeaders;
-
-    @Value("${cors.allow-credentials}")
-    private boolean allowCredentials;
-
     @Bean
     public CorsFilter corsFilter() {
-        CorsConfiguration config = new CorsConfiguration();
-        
-        config.setAllowCredentials(allowCredentials);
-        config.setAllowedOrigins(Arrays.asList(allowedOrigins));
-        config.setAllowedMethods(Arrays.asList(allowedMethods));
-        config.setAllowedHeaders(List.of(allowedHeaders));
-        config.setExposedHeaders(Arrays.asList("Authorization", "X-Total-Count"));
-        config.setMaxAge(3600L); // Cache preflight for 1 hour
-        
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        CorsConfiguration config = new CorsConfiguration();
+
+        // Allow credentials (cookies, authorization headers, etc.)
+        config.setAllowCredentials(true);
+
+        // IMPORTANT: Use setAllowedOriginPatterns instead of setAllowedOrigins when allowCredentials is true
+        // For development: allow all origins
+        config.setAllowedOriginPatterns(Arrays.asList("*"));
+
+        // For production, replace with specific origins:
+        // config.setAllowedOriginPatterns(Arrays.asList(
+        //     "https://yourdomain.com",
+        //     "https://*.yourdomain.com",
+        //     "http://localhost:3000",
+        //     "http://localhost:5173"
+        // ));
+
+        // Allow all headers
+        config.setAllowedHeaders(Arrays.asList(
+                "Origin",
+                "Content-Type",
+                "Accept",
+                "Authorization",
+                "Access-Control-Request-Method",
+                "Access-Control-Request-Headers",
+                "X-Requested-With"
+        ));
+
+        // Allow all HTTP methods
+        config.setAllowedMethods(Arrays.asList(
+                "GET",
+                "POST",
+                "PUT",
+                "PATCH",
+                "DELETE",
+                "OPTIONS"
+        ));
+
+        // Expose headers that the client can access
+        config.setExposedHeaders(Arrays.asList(
+                "Authorization",
+                "Access-Control-Allow-Origin",
+                "Access-Control-Allow-Credentials"
+        ));
+
+        // How long the response from a pre-flight request can be cached (in seconds)
+        config.setMaxAge(3600L);
+
+        // Apply CORS configuration to all endpoints
         source.registerCorsConfiguration("/**", config);
-        
+
         return new CorsFilter(source);
     }
 }
