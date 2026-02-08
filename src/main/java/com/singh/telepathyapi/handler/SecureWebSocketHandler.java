@@ -147,8 +147,8 @@ public class SecureWebSocketHandler extends TextWebSocketHandler {
     /**
      * Process text message with support for chunked messages
      */
-    // Add this improved method to your SecureWebSocketHandler.java
-// Replace the existing processTextMessage method (around line 150-192)
+// Add this to your SecureWebSocketHandler.java
+// Update the processTextMessage method to handle PING specially
 
     /**
      * Process text message with support for chunked messages
@@ -165,21 +165,34 @@ public class SecureWebSocketHandler extends TextWebSocketHandler {
             // Parse message
             JsonNode jsonPayload = objectMapper.readTree(payload);
 
-            // Extract message type for better logging
+            // Extract message type
             String messageType = jsonPayload.has("type") ? jsonPayload.get("type").asText() : "unknown";
 
-            // Extract recipient with detailed logging
+            // SPECIAL HANDLING: PING messages don't need a recipient
+            if ("PING".equals(messageType)) {
+                log.debug("💓 PING received from {}", fromUserId);
+                updateConnectionHealth(fromUserId);
+
+                // Optionally send PONG back
+                try {
+                    Map<String, Object> pong = Map.of(
+                            "type", "PONG",
+                            "timestamp", System.currentTimeMillis()
+                    );
+                    session.sendMessage(new TextMessage(objectMapper.writeValueAsString(pong)));
+                } catch (Exception e) {
+                    log.warn("⚠️ Failed to send PONG: {}", e.getMessage());
+                }
+                return; // Don't process further
+            }
+
+            // Extract recipient for all other message types
             String toUserId = extractRecipient(jsonPayload);
 
             if (toUserId == null || toUserId.isEmpty()) {
-                // IMPROVED: Show what the message looks like
                 log.warn("⚠️ Message without recipient from {}", fromUserId);
                 log.warn("   Message type: {}", messageType);
                 log.warn("   Expected one of: 'to', 'recipientId', or 'peerId'");
-
-                // Show first 200 chars of the message for debugging
-                String preview = payload.length() > 200 ? payload.substring(0, 200) + "..." : payload;
-                log.warn("   Message preview: {}", preview);
 
                 sendErrorToSender(session,
                         "Missing recipient field. Please include 'to', 'recipientId', or 'peerId' in your message.");
@@ -211,8 +224,7 @@ public class SecureWebSocketHandler extends TextWebSocketHandler {
                 log.error("❌ Failed to send error message: {}", ex.getMessage());
             }
         }
-    }
-    /**
+    }  /**
      * STREAMING: Send large messages in chunks
      * This is how Zoom/Signal handle large SDP offers
      */
