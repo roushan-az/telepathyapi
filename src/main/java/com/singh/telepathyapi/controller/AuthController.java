@@ -191,4 +191,25 @@ public class AuthController {
         private String phone;
         private String password;
     }
+    @PostMapping("/anonymous")
+    public ResponseEntity<?> anonymousLogin() {
+        // Signal-style: device identity, no password
+        String userId = UUID.randomUUID().toString();
+
+        String accessToken = tokenProvider.generateToken(userId);
+        String refreshToken = tokenProvider.generateRefreshToken(userId);
+
+        log.info("Anonymous session created: {}", userId);
+
+        return ResponseEntity.ok(Map.of(
+                "userId", userId,
+                "accessToken", accessToken,
+                "refreshToken", refreshToken,
+                "user", Map.of(
+                        "userId", userId,
+                        "name", "Anonymous"
+                )
+        ));
+    }
+
 }

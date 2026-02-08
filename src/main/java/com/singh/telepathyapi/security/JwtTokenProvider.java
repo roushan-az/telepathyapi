@@ -82,26 +82,16 @@ public class JwtTokenProvider {
      * Validate token
      */
     public boolean validateToken(String token) {
+        if (token == null || token.isBlank() || token.equals("undefined")) {
+            return false;
+        }
         try {
             SecretKey key = Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
-
-            Jwts.parser()
-                    .verifyWith(key)
-                    .build()
-                    .parseSignedClaims(token);
-            
+            Jwts.parser().verifyWith(key).build().parseSignedClaims(token);
             return true;
-        } catch (SecurityException ex) {
-            log.error("Invalid JWT signature");
-        } catch (MalformedJwtException ex) {
-            log.error("Invalid JWT token");
-        } catch (ExpiredJwtException ex) {
-            log.error("Expired JWT token");
-        } catch (UnsupportedJwtException ex) {
-            log.error("Unsupported JWT token");
-        } catch (IllegalArgumentException ex) {
-            log.error("JWT claims string is empty");
+        } catch (JwtException | IllegalArgumentException e) {
+            log.error("Invalid JWT", e);
+            return false;
         }
-        return false;
     }
 }

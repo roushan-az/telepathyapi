@@ -7,56 +7,52 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class PresenceService {
 
-    private final RedisTemplate<String, Object> redisTemplate;
-    private final SimpMessagingTemplate messagingTemplate;
+    private final Set<String> onlineUsers = ConcurrentHashMap.newKeySet();
+    private final MessagingService messagingService;
 
-    private static final String PRESENCE_PREFIX = "presence:";
-    private static final int PRESENCE_TTL_SECONDS = 60;
+    public PresenceService(MessagingService messagingService) {
+        this.messagingService = messagingService;
+    }
 
     public void userOnline(String userId) {
-        String key = PRESENCE_PREFIX + userId;
-        Map<String, Object> presence = new HashMap<>();
-        presence.put("status", "online");
-        presence.put("lastSeen", System.currentTimeMillis());
-
-        redisTemplate.opsForValue().set(key, presence, PRESENCE_TTL_SECONDS, TimeUnit.SECONDS);
-        broadcastPresence(userId, "online");
-        log.debug("User {} is now online", userId);
+        onlineUsers.add(userId);
+        broadcastPresence(userId, true);
     }
 
     public void userOffline(String userId) {
-        redisTemplate.delete(PRESENCE_PREFIX + userId);
-        broadcastPresence(userId, "offline");
-        log.debug("User {} is now offline", userId);
+        onlineUsers.remove(userId);
+        broadcastPresence(userId, false);
     }
 
-    public boolean isUserOnline(String userId) {
-        return redisTemplate.hasKey(PRESENCE_PREFIX + userId);
+    public boolean isOnline(String userId) {
+        return onlineUsers.contains(userId);
     }
 
-    @SuppressWarnings("unchecked")
-    public Map<String, Object> getUserPresence(String userId) {
-        Map<String, Object> presence = (Map<String, Object>) redisTemplate.opsForValue().get(PRESENCE_PREFIX + userId);
-        if (presence == null) return Map.of("status", "offline", "lastSeen", null);
-        return presence;
-    }
+    private void broadcastPresence(String userId, boolean online) {
+        // OPTIONAL: encrypted presence message
+        // Server still does not inspect payload semantics
+        try {
+            String payload = """
+                {
+                  "type": "PRESENCE",
+                  "user": "%s",
+                  "online": %s
+                }
+                """.formatted(userId, online);
 
-    private void broadcastPresence(String userId, String status) {
-        Map<String, Object> presenceUpdate = new HashMap<>();
-        presenceUpdate.put("userId", userId);
-        presenceUpdate.put("status", status);
-        presenceUpdate.put("timestamp", System.currentTimeMillis());
+            // In real Signal-style systems, this is usually opt-in
+            // or fetched on demand rather than broadcast
+            messagingService.send(userId, payload);
 
-        messagingTemplate.convertAndSend(
-                "/topic/presence/" + userId,
-                (Object) presenceUpdate
-        );
+        } catch (Exception ignored) {
+            // Presence failure should never crash the server
+        }
     }
 }

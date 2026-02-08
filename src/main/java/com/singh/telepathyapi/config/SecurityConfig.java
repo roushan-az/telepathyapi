@@ -18,70 +18,88 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
-import java.util.Arrays;
+import java.util.List;
 
-/**
- * Security Configuration
- * 
- * Signal-Style Security:
- * - Stateless JWT authentication
- * - No session storage
- * - CORS configured for WebRTC
- * - All endpoints except auth require authentication
- */
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
-
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-    private final JwtAuthenticationFilter jwtAuthFilter;
+    private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+
         http
-            .csrf(csrf -> csrf.disable()) // Disabled for stateless API
-            .cors(cors -> cors.configure(http)) // Enable CORS
-            .sessionManagement(session -> 
-                session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .authorizeHttpRequests(auth -> auth
-                // Public endpoints
-                .requestMatchers(
-                    "/api/auth/**",
-                    "/ws/**",
-                    "/actuator/health",
-                    "/api/public/**"
-                ).permitAll()
-                // All other endpoints require authentication
-                .anyRequest().authenticated()
-            )
-            .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+                // 🚫 No CSRF (stateless API + WebSocket)
+                .csrf(csrf -> csrf.disable())
+
+                // 🌍 CORS
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+
+                // 🚫 No sessions (Signal-style)
+                .sessionManagement(session ->
+                        session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+                )
+
+                // 🔐 Authorization rules
+                .authorizeHttpRequests(auth -> auth
+                        // ✅ PUBLIC ENDPOINTS
+                        .requestMatchers(
+                                "/api/auth/**",
+                                "/ws/**",
+                                "/actuator/health"
+                        ).permitAll()
+
+                        // 🔒 EVERYTHING ELSE
+                        .anyRequest().authenticated()
+                )
+
+                // 🧠 JWT filter
+                .addFilterBefore(
+                        jwtAuthenticationFilter,
+                        UsernamePasswordAuthenticationFilter.class
+                );
 
         return http.build();
     }
 
+    // 🔐 Password hashing
     @Bean
     public PasswordEncoder passwordEncoder() {
-        // BCrypt for password hashing (only stored credential)
         return new BCryptPasswordEncoder(12);
     }
 
+    // 🔑 Authentication manager
     @Bean
     public AuthenticationManager authenticationManager(
-            AuthenticationConfiguration config) throws Exception {
+            AuthenticationConfiguration config
+    ) throws Exception {
         return config.getAuthenticationManager();
     }
 
+    // 🌍 CORS config for React + WebSocket
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(Arrays.asList("http://localhost:5173")); // Your React Port
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type"));
-        configuration.setAllowCredentials(true);
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", configuration);
+        CorsConfiguration config = new CorsConfiguration();
+
+        config.setAllowedOrigins(List.of(
+                "http://localhost:5173",
+                "http://localhost:3000"
+        ));
+        config.setAllowedMethods(List.of(
+                "GET", "POST", "PUT", "DELETE", "OPTIONS"
+        ));
+        config.setAllowedHeaders(List.of(
+                "Authorization",
+                "Content-Type"
+        ));
+        config.setAllowCredentials(true);
+
+        UrlBasedCorsConfigurationSource source =
+                new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", config);
         return source;
     }
 }
